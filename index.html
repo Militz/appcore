@@ -6,6 +6,95 @@
     <title>AppCore 🦄</title>
 </head>
 <body>
-  <h1>test</h1>
+    <div class="container">
+
+        <button class="true">Sant
+        </div>
+        <button class="false">Falskt
+        </button>
+
+    </div>
+
+  <style>
+    html, body {
+        margin:0;
+        padding:0;
+        background-color: #171717;
+        color:white;
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        box-sizing: border-box;
+        overflow: hidden; 
+        
+    }
+
+    .true, .false {
+        display: flex;
+        background-color: green;
+        width: 100%;
+        height:50vh;
+        justify-content: center;
+        font-size: 6rem;;
+        align-items: center;
+        color: #fff;
+        text-shadow: 0.1rem 0.1rem #000;
+        transition: height 1s ease;
+    }
+
+    .zero-height {
+        height: 0vh;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .max-height {
+        height: 100vh;
+    }
+
+    .false {
+        background-color: red;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+        font-size: 5rem;
+    }
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelector(".true").addEventListener("click", animateButton);
+        document.querySelector(".false").addEventListener("click", animateButton);
+    });
+
+    animateButton  = (el)=> {
+        let current = el.target;
+        let currentClass = el.target.classList;
+
+
+        if(current.classList.contains('true')) {
+            document.querySelector(".false").classList.add("zero-height");
+            current.classList.add("max-height");
+
+        } else {
+            document.querySelector(".true").classList.add("zero-height");
+            current.classList.add("max-height");
+        }
+
+        current.addEventListener("click", () => {
+            document.querySelector(".true").className = "true";
+            document.querySelector(".false").className = "false";
+        })
+
+        console.log(el);
+    };
+
+  </script>
+</body>
+</html>
+
+      
+
 </body>
 </html>
