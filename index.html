@@ -85,11 +85,11 @@
         current.addEventListener("click", () => {
             document.querySelector(".true").className = "true";
             document.querySelector(".false").className = "false";
-            document.querySelector(".true").addEventListener("click", animateButton);
-            document.querySelector(".false").addEventListener("click", animateButton);
+
         })
 
-        console.log(el);
+        document.querySelector(".true").addEventListener("click", animateButton);
+        document.querySelector(".false").addEventListener("click", animateButton);
     };
 
   </script>
