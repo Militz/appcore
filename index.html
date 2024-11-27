@@ -4,99 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AppCore 🦄</title>
-</head>
-<body>
-    <div class="container">
-
-        <button class="true">Sant
-        </div>
-        <button class="false">Falskt
-        </button>
-
-    </div>
-
-  <style>
-    html, body {
-        margin:0;
-        padding:0;
-        background-color: #171717;
-        color:white;
-        font-family: Helvetica, Arial, sans-serif;
-        font-size: 16px;
-        box-sizing: border-box;
-        overflow: hidden; 
-        
-    }
-
-    .true, .false {
-        display: flex;
-        background-color: green;
-        width: 100%;
-        height:50vh;
-        justify-content: center;
-        font-size: 6rem;;
-        align-items: center;
-        color: #fff;
-        text-shadow: 0.1rem 0.1rem #000;
-        transition: height 1s ease;
-    }
-
-    .zero-height {
-        height: 0vh;
-        overflow: hidden;
-        padding: 0;
-    }
-
-    .max-height {
-        height: 100vh;
-    }
-
-    .false {
-        background-color: red;
-    }
-
-    .container {
-        display: flex;
-        flex-direction: column;
-        text-align: center;
-        font-size: 5rem;
-    }
-  </style>
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        document.querySelector(".true").addEventListener("click", animateButton);
-        document.querySelector(".false").addEventListener("click", animateButton);
-    });
-
-    animateButton  = (el)=> {
-        let current = el.target;
-        let currentClass = el.target.classList;
-
-
-        if(current.classList.contains('true')) {
-            document.querySelector(".false").classList.add("zero-height");
-            current.classList.add("max-height");
-
-        } else {
-            document.querySelector(".true").classList.add("zero-height");
-            current.classList.add("max-height");
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: #171717;
+            color: white;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 16px;
+            box-sizing: border-box;
+            overflow: hidden; 
         }
 
-        current.addEventListener("click", () => {
-            document.querySelector(".true").className = "true";
-            document.querySelector(".false").className = "false";
+        .true, .false {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 50vh;
+            font-size: 6rem;
+            color: #fff;
+            text-shadow: 0.1rem 0.1rem #000;
+            transition: height 1s ease;
+        }
 
-        })
+        .true {
+            background-color: green;
+        }
 
-        document.querySelector(".true").addEventListener("click", animateButton);
-        document.querySelector(".false").addEventListener("click", animateButton);
-    };
+        .false {
+            background-color: red;
+        }
 
-  </script>
-</body>
-</html>
+        .zero-height {
+            height: 0vh;
+            overflow: hidden;
+            padding: 0;
+        }
 
-      
+        .max-height {
+            height: 100vh;
+        }
 
+        .container {
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+            font-size: 5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" data-action="false">
+        <button class="true" data-class="true">Sant</button>
+        <button class="false" data-class="false">Falskt</button>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeButtons();
+        });
+
+        const initializeButtons = () => {
+            const buttons = document.querySelectorAll("button");
+            buttons.forEach(button => {
+                button.addEventListener("click", () => handleButtonClick(button));
+            });
+        };
+
+        const handleButtonClick = (button) => {
+            const container = button.parentElement;
+            const actionState = container.getAttribute("data-action");
+
+            if (actionState === "true") {
+                resetButtons();
+                return;
+            }
+
+            const buttonClass = button.getAttribute("data-class");
+            button.classList.add("max-height");
+
+            const oppositeButton = document.querySelector(`.${buttonClass === "true" ? "false" : "true"}`);
+            oppositeButton.classList.add("zero-height");
+
+            container.setAttribute("data-action", "true");
+        };
+
+        const resetButtons = () => {
+            const container = document.querySelector(".container");
+            container.setAttribute("data-action", "false");
+
+            const buttons = document.querySelectorAll("button");
+            buttons.forEach(button => {
+                const originalClass = button.getAttribute("data-class");
+                button.className = originalClass;
+            });
+        };
+    </script>
 </body>
 </html>
