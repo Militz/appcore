@@ -150,8 +150,8 @@
       <div>
         <label for="channelSelect" class="field-label">Kanal</label>
         <select id="channelSelect" class="select" aria-label="Choose SR channel">
-          <option value="https://edge1.sr.se/p1-aac-320">P1</option>
-          <option value="https://edge1.sr.se/p2-mp3-96">P2</option>
+          <option value="https://live1.sr.se/p1-mp3-96">P1</option>
+          <option value="https://live1.sr.se/p2-mp3-96">P2</option>
           <option value="https://live1.sr.se/p3-mp3-96">P3</option>
         </select>
       </div>
@@ -170,7 +170,7 @@
       id="streamUrl"
       class="stream-url"
       type="text"
-      value="https://live1.sr.se/p1-aac-320"
+      value="https://live1.sr.se/p1-mp3-96"
       aria-label="Audio stream URL"
     />
 
@@ -179,6 +179,7 @@
     <div class="controls">
       <button id="loadBtn" class="secondary">Ladda ström</button>
       <button id="speechBtn" class="primary">Aktivera speech boost</button>
+      <button id="testBtn" class="secondary">Testa effekt</button>
     </div>
 
     <div class="status" id="status">
@@ -199,6 +200,7 @@
     const streamUrlInput = document.getElementById('streamUrl');
     const channelSelect = document.getElementById('channelSelect');
     const strengthSelect = document.getElementById('strengthSelect');
+    const testBtn = document.getElementById('testBtn');
 
     let audioContext;
     let sourceNode;
@@ -211,6 +213,7 @@
     let initialized = false;
     let speechEnabled = false;
     let speechStrength = 'medium';
+    let isTestingEffect = false;
 
     function setStatus(message, enabled) {
       statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
@@ -220,44 +223,44 @@
       if (!initialized) return;
 
       if (speechStrength === 'low') {
-        highpass.frequency.value = 100;
+        highpass.frequency.value = 160;
         mudCut.frequency.value = 280;
-        mudCut.Q.value = 0.9;
-        mudCut.gain.value = -1.5;
-        presenceBoost.frequency.value = 2600;
-        presenceBoost.Q.value = 1.0;
-        presenceBoost.gain.value = 2.0;
-        compressor.threshold.value = -20;
-        compressor.knee.value = 18;
-        compressor.ratio.value = 2;
-        compressor.attack.value = 0.004;
-        compressor.release.value = 0.22;
-      } else if (speechStrength === 'high') {
-        highpass.frequency.value = 140;
-        mudCut.frequency.value = 320;
-        mudCut.Q.value = 1.1;
-        mudCut.gain.value = -3.5;
-        presenceBoost.frequency.value = 3000;
-        presenceBoost.Q.value = 1.4;
-        presenceBoost.gain.value = 5.0;
-        compressor.threshold.value = -28;
-        compressor.knee.value = 24;
-        compressor.ratio.value = 4;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.28;
-      } else {
-        highpass.frequency.value = 120;
-        mudCut.frequency.value = 300;
         mudCut.Q.value = 1.0;
-        mudCut.gain.value = -2.5;
-        presenceBoost.frequency.value = 2800;
-        presenceBoost.Q.value = 1.2;
-        presenceBoost.gain.value = 3.5;
-        compressor.threshold.value = -24;
+        mudCut.gain.value = -3.0;
+        presenceBoost.frequency.value = 2600;
+        presenceBoost.Q.value = 1.4;
+        presenceBoost.gain.value = 4.5;
+        compressor.threshold.value = -26;
         compressor.knee.value = 20;
         compressor.ratio.value = 3;
         compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
+        compressor.release.value = 0.20;
+      } else if (speechStrength === 'high') {
+        highpass.frequency.value = 220;
+        mudCut.frequency.value = 320;
+        mudCut.Q.value = 1.2;
+        mudCut.gain.value = -6.0;
+        presenceBoost.frequency.value = 3200;
+        presenceBoost.Q.value = 1.8;
+        presenceBoost.gain.value = 9.0;
+        compressor.threshold.value = -34;
+        compressor.knee.value = 28;
+        compressor.ratio.value = 6;
+        compressor.attack.value = 0.002;
+        compressor.release.value = 0.30;
+      } else {
+        highpass.frequency.value = 180;
+        mudCut.frequency.value = 300;
+        mudCut.Q.value = 1.1;
+        mudCut.gain.value = -4.5;
+        presenceBoost.frequency.value = 2900;
+        presenceBoost.Q.value = 1.6;
+        presenceBoost.gain.value = 6.5;
+        compressor.threshold.value = -30;
+        compressor.knee.value = 24;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.0025;
+        compressor.release.value = 0.24;
       }
     }
 
@@ -309,7 +312,7 @@
       if (!initialized) return;
 
       dryGain.gain.value = speechEnabled ? 0 : 1;
-      wetGain.gain.value = speechEnabled ? 1 : 0;
+      wetGain.gain.value = speechEnabled ? 1.1 : 0;
 
       const labels = { low: 'låg', medium: 'mellan', high: 'stark' };
       const message = speechEnabled
@@ -372,6 +375,30 @@
       } catch (error) {
         console.error(error);
         setStatus('Speech enhancement could not be enabled. The stream may not allow cross-origin audio processing.', false);
+      }
+    });
+
+    testBtn.addEventListener('click', async () => {
+      try {
+        await ensureAudioGraph();
+        isTestingEffect = true;
+        speechEnabled = false;
+        applySpeechState();
+        setStatus('Testläge: original i 2 sekunder, sedan speech boost i 2 sekunder.', false);
+
+        setTimeout(() => {
+          speechEnabled = true;
+          applySpeechState();
+        }, 2000);
+
+        setTimeout(() => {
+          speechEnabled = false;
+          applySpeechState();
+          isTestingEffect = false;
+          setStatus('Test klart. Jämför nu manuellt med knappen för speech boost.', false);
+        }, 4000);
+      } catch (error) {
+        console.error(error);
       }
     });
 
