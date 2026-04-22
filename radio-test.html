@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Speech Boost Player</title>
+  <title>SR Speech Boost Player</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -30,7 +30,7 @@
     }
 
     .card {
-      width: min(720px, 100%);
+      width: min(760px, 100%);
       background: rgba(17, 24, 39, 0.92);
       border: 1px solid var(--border);
       border-radius: 24px;
@@ -50,6 +50,14 @@
       line-height: 1.5;
     }
 
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .select,
     .stream-url {
       display: block;
       width: 100%;
@@ -83,7 +91,7 @@
       font-size: 0.95rem;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+      transition: transform 0.15s ease, background 0.15s ease;
     }
 
     button:hover { transform: translateY(-1px); }
@@ -118,28 +126,46 @@
       color: var(--muted);
     }
 
-    code {
-      background: rgba(255,255,255,0.06);
-      padding: 2px 6px;
-      border-radius: 8px;
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <main class="card">
-    <h1>Speech Boost Audio Player</h1>
+    <h1>SR Speech Boost Player</h1>
     <p>
-      Plays the SR stream and lets you toggle a simple speech-enhancement chain
-      using the Web Audio API.
+      Simple web player with channel selection, HLS support, and toggleable speech enhancement.
     </p>
 
-    <label for="channelSelect" class="small" style="display:block; margin-bottom:8px;">Choose channel</label>
-    <select id="channelSelect" class="stream-url" aria-label="Choose SR channel">
-      <option value="https://live1.sr.se/p1-aac-320">P1</option>
-      <option value="https://live1.sr.se/p2-aac-320">P2</option>
-      <option value="https://live1.sr.se/p3-aac-320">P3</option>
-    </select>
+    <div class="grid">
+      <div>
+        <label for="channelSelect" class="field-label">Kanal</label>
+        <select id="channelSelect" class="select" aria-label="Choose SR channel">
+          <option value="https://live1.sr.se/p1-aac-320">P1</option>
+          <option value="https://live1.sr.se/p2-aac-320">P2</option>
+          <option value="https://live1.sr.se/p3-aac-320">P3</option>
+        </select>
+      </div>
+      <div>
+        <label for="strengthSelect" class="field-label">Speech boost</label>
+        <select id="strengthSelect" class="select" aria-label="Speech boost strength">
+          <option value="low">Låg</option>
+          <option value="medium" selected>Mellan</option>
+          <option value="high">Stark</option>
+        </select>
+      </div>
+    </div>
 
+    <label for="streamUrl" class="field-label">Ström-URL</label>
     <input
       id="streamUrl"
       class="stream-url"
@@ -148,28 +174,11 @@
       aria-label="Audio stream URL"
     />
 
-    <audio id="player" controls crossorigin="anonymous">
-      <source src="https://live1.sr.se/p1-aac-320" type="audio/aac" />
-      Your browser does not support the audio element.
-    </audio>
-
-    <label for="strengthSelect" class="small" style="display:block; margin-bottom:8px;">Speech boost strength</label>
-    <select id="strengthSelect" class="stream-url" aria-label="Speech boost strength">
-      <option value="low">Låg</option>
-      <option value="medium" selected>Mellan</option>
-      <option value="high">Stark</option>
-    </select>
-
-    <label for="strengthSelect" class="small" style="display:block; margin-bottom:8px;">Speech boost strength</label>
-    <select id="strengthSelect" class="stream-url" aria-label="Speech boost strength">
-      <option value="low">Låg</option>
-      <option value="medium" selected>Mellan</option>
-      <option value="high">Stark</option>
-    </select>
+    <audio id="player" controls crossorigin="anonymous"></audio>
 
     <div class="controls">
-      <button id="loadBtn" class="secondary">Load stream</button>
-      <button id="speechBtn" class="primary">Enable speech boost</button>
+      <button id="loadBtn" class="secondary">Ladda ström</button>
+      <button id="speechBtn" class="primary">Aktivera speech boost</button>
     </div>
 
     <div class="status" id="status">
@@ -178,11 +187,11 @@
     </div>
 
     <div class="small">
-      Note: speech boost works best if the stream allows Web Audio processing via
-      CORS. Most browsers also require a user gesture before audio processing can start.
+      HLS stöds via browserns inbyggda stöd eller hls.js. Speech boost kräver också att strömmen tillåter Web Audio/CORS.
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
     const audio = document.getElementById('player');
     const speechBtn = document.getElementById('speechBtn');
@@ -190,7 +199,6 @@
     const loadBtn = document.getElementById('loadBtn');
     const streamUrlInput = document.getElementById('streamUrl');
     const channelSelect = document.getElementById('channelSelect');
-    const strengthSelect = document.getElementById('strengthSelect');
     const strengthSelect = document.getElementById('strengthSelect');
 
     let audioContext;
@@ -204,55 +212,10 @@
     let initialized = false;
     let speechEnabled = false;
     let speechStrength = 'medium';
-    let speechStrength = 'medium';
+    let hls = null;
 
     function setStatus(message, enabled) {
       statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
-    }
-
-    function applySpeechPreset() {
-      if (!initialized) return;
-
-      if (speechStrength === 'low') {
-        highpass.frequency.value = 100;
-        mudCut.frequency.value = 280;
-        mudCut.Q.value = 0.9;
-        mudCut.gain.value = -1.5;
-        presenceBoost.frequency.value = 2600;
-        presenceBoost.Q.value = 1.0;
-        presenceBoost.gain.value = 2.0;
-        compressor.threshold.value = -20;
-        compressor.knee.value = 18;
-        compressor.ratio.value = 2;
-        compressor.attack.value = 0.004;
-        compressor.release.value = 0.22;
-      } else if (speechStrength === 'high') {
-        highpass.frequency.value = 140;
-        mudCut.frequency.value = 320;
-        mudCut.Q.value = 1.1;
-        mudCut.gain.value = -3.5;
-        presenceBoost.frequency.value = 3000;
-        presenceBoost.Q.value = 1.4;
-        presenceBoost.gain.value = 5.0;
-        compressor.threshold.value = -28;
-        compressor.knee.value = 24;
-        compressor.ratio.value = 4;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.28;
-      } else {
-        highpass.frequency.value = 120;
-        mudCut.frequency.value = 300;
-        mudCut.Q.value = 1.0;
-        mudCut.gain.value = -2.5;
-        presenceBoost.frequency.value = 2800;
-        presenceBoost.Q.value = 1.2;
-        presenceBoost.gain.value = 3.5;
-        compressor.threshold.value = -24;
-        compressor.knee.value = 20;
-        compressor.ratio.value = 3;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
-      }
     }
 
     function applySpeechPreset() {
@@ -316,32 +279,18 @@
 
       highpass = audioContext.createBiquadFilter();
       highpass.type = 'highpass';
-      highpass.frequency.value = 120;
 
       mudCut = audioContext.createBiquadFilter();
       mudCut.type = 'peaking';
-      mudCut.frequency.value = 300;
-      mudCut.Q.value = 1.0;
-      mudCut.gain.value = -2.5;
 
       presenceBoost = audioContext.createBiquadFilter();
       presenceBoost.type = 'peaking';
-      presenceBoost.frequency.value = 2800;
-      presenceBoost.Q.value = 1.2;
-      presenceBoost.gain.value = 3.5;
 
       compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -24;
-      compressor.knee.value = 20;
-      compressor.ratio.value = 3;
-      compressor.attack.value = 0.003;
-      compressor.release.value = 0.25;
 
-      // Dry path
       sourceNode.connect(dryGain);
       dryGain.connect(audioContext.destination);
 
-      // Wet path
       sourceNode.connect(highpass);
       highpass.connect(mudCut);
       mudCut.connect(presenceBoost);
@@ -350,14 +299,12 @@
       wetGain.connect(audioContext.destination);
 
       initialized = true;
+      applySpeechPreset();
+      applySpeechState();
 
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
-
-      applySpeechPreset();
-      applySpeechPreset();
-      applySpeechState();
     }
 
     function applySpeechState() {
@@ -366,35 +313,50 @@
       dryGain.gain.value = speechEnabled ? 0 : 1;
       wetGain.gain.value = speechEnabled ? 1 : 0;
 
-      const labels = {
-        low: 'Låg',
-        medium: 'Mellan',
-        high: 'Stark'
-      };
+      const labels = { low: 'låg', medium: 'mellan', high: 'stark' };
+      const message = speechEnabled
+        ? `Speech boost är aktiv med ${labels[speechStrength]} filtrering och lätt kompression.`
+        : 'Original audio is playing without enhancement.';
 
-      setStatus(
-        speechEnabled
-          ? `Speech frequencies are being emphasized with ${labels[speechStrength].toLowerCase()} filtering and light compression.`
-          : 'Original audio is playing without enhancement.',
-        speechEnabled
-      );
+      setStatus(message, speechEnabled);
+      speechBtn.textContent = speechEnabled ? 'Stäng av speech boost' : 'Aktivera speech boost';
+    }
 
-      speechBtn.textContent = speechEnabled ? 'Disable speech boost' : 'Enable speech boost';
+    function destroyHls() {
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+    }
+
+    function looksLikeHls(url) {
+      return url.includes('.m3u8');
+    }
+
+    async function loadStream(url) {
+      destroyHls();
+      audio.pause();
+
+      if (looksLikeHls(url)) {
+        if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+          audio.src = url;
+        } else if (window.Hls && Hls.isSupported()) {
+          hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(audio);
+        } else {
+          throw new Error('HLS is not supported in this browser.');
+        }
+      } else {
+        audio.src = url;
+      }
+
+      audio.load();
+      await ensureAudioGraph();
     }
 
     channelSelect.addEventListener('change', () => {
       streamUrlInput.value = channelSelect.value;
-    });
-
-    strengthSelect.addEventListener('change', async () => {
-      speechStrength = strengthSelect.value;
-      try {
-        await ensureAudioGraph();
-        applySpeechPreset();
-        applySpeechState();
-      } catch (error) {
-        console.error(error);
-      }
     });
 
     strengthSelect.addEventListener('change', async () => {
@@ -415,16 +377,12 @@
         return;
       }
 
-      audio.pause();
-      audio.src = url;
-      audio.load();
-
       try {
-        await ensureAudioGraph();
-        setStatus('Stream loaded. Press play to start listening.', speechEnabled);
+        await loadStream(url);
+        setStatus(`Ström laddad från ${channelSelect.options[channelSelect.selectedIndex]?.text || 'vald kanal'}. Tryck på play för att lyssna.`, speechEnabled);
       } catch (error) {
         console.error(error);
-        setStatus('Could not initialize audio processing. The stream may block Web Audio processing.', false);
+        setStatus('Kunde inte ladda strömmen eller initiera ljudbehandling.', false);
       }
     });
 
@@ -448,18 +406,6 @@
     });
 
     streamUrlInput.value = channelSelect.value;
-
-    audio.addEventListener('loadedmetadata', () => {
-      setStatus(`Stream loaded from ${channelSelect.options[channelSelect.selectedIndex]?.text || 'selected channel'}. Press play to start listening.`, speechEnabled);
-    });
-
-    audio.addEventListener('play', async () => {
-      try {
-        await ensureAudioGraph();
-      } catch (error) {
-        console.error(error);
-      }
-    });
   </script>
 </body>
 </html>
