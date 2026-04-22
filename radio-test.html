@@ -153,6 +153,20 @@
       Your browser does not support the audio element.
     </audio>
 
+    <label for="strengthSelect" class="small" style="display:block; margin-bottom:8px;">Speech boost strength</label>
+    <select id="strengthSelect" class="stream-url" aria-label="Speech boost strength">
+      <option value="low">Låg</option>
+      <option value="medium" selected>Mellan</option>
+      <option value="high">Stark</option>
+    </select>
+
+    <label for="strengthSelect" class="small" style="display:block; margin-bottom:8px;">Speech boost strength</label>
+    <select id="strengthSelect" class="stream-url" aria-label="Speech boost strength">
+      <option value="low">Låg</option>
+      <option value="medium" selected>Mellan</option>
+      <option value="high">Stark</option>
+    </select>
+
     <div class="controls">
       <button id="loadBtn" class="secondary">Load stream</button>
       <button id="speechBtn" class="primary">Enable speech boost</button>
@@ -176,6 +190,8 @@
     const loadBtn = document.getElementById('loadBtn');
     const streamUrlInput = document.getElementById('streamUrl');
     const channelSelect = document.getElementById('channelSelect');
+    const strengthSelect = document.getElementById('strengthSelect');
+    const strengthSelect = document.getElementById('strengthSelect');
 
     let audioContext;
     let sourceNode;
@@ -187,9 +203,101 @@
     let compressor;
     let initialized = false;
     let speechEnabled = false;
+    let speechStrength = 'medium';
+    let speechStrength = 'medium';
 
     function setStatus(message, enabled) {
       statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
+    }
+
+    function applySpeechPreset() {
+      if (!initialized) return;
+
+      if (speechStrength === 'low') {
+        highpass.frequency.value = 100;
+        mudCut.frequency.value = 280;
+        mudCut.Q.value = 0.9;
+        mudCut.gain.value = -1.5;
+        presenceBoost.frequency.value = 2600;
+        presenceBoost.Q.value = 1.0;
+        presenceBoost.gain.value = 2.0;
+        compressor.threshold.value = -20;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 2;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.22;
+      } else if (speechStrength === 'high') {
+        highpass.frequency.value = 140;
+        mudCut.frequency.value = 320;
+        mudCut.Q.value = 1.1;
+        mudCut.gain.value = -3.5;
+        presenceBoost.frequency.value = 3000;
+        presenceBoost.Q.value = 1.4;
+        presenceBoost.gain.value = 5.0;
+        compressor.threshold.value = -28;
+        compressor.knee.value = 24;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.28;
+      } else {
+        highpass.frequency.value = 120;
+        mudCut.frequency.value = 300;
+        mudCut.Q.value = 1.0;
+        mudCut.gain.value = -2.5;
+        presenceBoost.frequency.value = 2800;
+        presenceBoost.Q.value = 1.2;
+        presenceBoost.gain.value = 3.5;
+        compressor.threshold.value = -24;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 3;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+      }
+    }
+
+    function applySpeechPreset() {
+      if (!initialized) return;
+
+      if (speechStrength === 'low') {
+        highpass.frequency.value = 100;
+        mudCut.frequency.value = 280;
+        mudCut.Q.value = 0.9;
+        mudCut.gain.value = -1.5;
+        presenceBoost.frequency.value = 2600;
+        presenceBoost.Q.value = 1.0;
+        presenceBoost.gain.value = 2.0;
+        compressor.threshold.value = -20;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 2;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.22;
+      } else if (speechStrength === 'high') {
+        highpass.frequency.value = 140;
+        mudCut.frequency.value = 320;
+        mudCut.Q.value = 1.1;
+        mudCut.gain.value = -3.5;
+        presenceBoost.frequency.value = 3000;
+        presenceBoost.Q.value = 1.4;
+        presenceBoost.gain.value = 5.0;
+        compressor.threshold.value = -28;
+        compressor.knee.value = 24;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.28;
+      } else {
+        highpass.frequency.value = 120;
+        mudCut.frequency.value = 300;
+        mudCut.Q.value = 1.0;
+        mudCut.gain.value = -2.5;
+        presenceBoost.frequency.value = 2800;
+        presenceBoost.Q.value = 1.2;
+        presenceBoost.gain.value = 3.5;
+        compressor.threshold.value = -24;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 3;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+      }
     }
 
     async function ensureAudioGraph() {
@@ -247,6 +355,8 @@
         await audioContext.resume();
       }
 
+      applySpeechPreset();
+      applySpeechPreset();
       applySpeechState();
     }
 
@@ -256,9 +366,15 @@
       dryGain.gain.value = speechEnabled ? 0 : 1;
       wetGain.gain.value = speechEnabled ? 1 : 0;
 
+      const labels = {
+        low: 'Låg',
+        medium: 'Mellan',
+        high: 'Stark'
+      };
+
       setStatus(
         speechEnabled
-          ? 'Speech frequencies are being emphasized with light compression.'
+          ? `Speech frequencies are being emphasized with ${labels[speechStrength].toLowerCase()} filtering and light compression.`
           : 'Original audio is playing without enhancement.',
         speechEnabled
       );
@@ -268,6 +384,28 @@
 
     channelSelect.addEventListener('change', () => {
       streamUrlInput.value = channelSelect.value;
+    });
+
+    strengthSelect.addEventListener('change', async () => {
+      speechStrength = strengthSelect.value;
+      try {
+        await ensureAudioGraph();
+        applySpeechPreset();
+        applySpeechState();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    strengthSelect.addEventListener('change', async () => {
+      speechStrength = strengthSelect.value;
+      try {
+        await ensureAudioGraph();
+        applySpeechPreset();
+        applySpeechState();
+      } catch (error) {
+        console.error(error);
+      }
     });
 
     loadBtn.addEventListener('click', async () => {
