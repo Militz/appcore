@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Speech Boost Player</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #22c55e;
+      --border: rgba(255,255,255,0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(720px, 100%);
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .stream-url {
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    audio {
+      width: 100%;
+      margin: 8px 0 20px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+
+    .primary {
+      background: var(--accent);
+      color: #082f49;
+    }
+
+    .secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .status {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .status strong.on { color: var(--accent-2); }
+    .status strong.off { color: #fda4af; }
+
+    .small {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    code {
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Speech Boost Audio Player</h1>
+    <p>
+      Plays the SR stream and lets you toggle a simple speech-enhancement chain
+      using the Web Audio API.
+    </p>
+
+    <input
+      id="streamUrl"
+      class="stream-url"
+      type="text"
+      value="https://edge1.sr.se/p1-mp3-96"
+      aria-label="Audio stream URL"
+    />
+
+    <audio id="player" controls crossorigin="anonymous">
+      <source src="https://edge1.sr.se/p1-mp3-96" type="audio/mpeg" />
+      Your browser does not support the audio element.
+    </audio>
+
+    <div class="controls">
+      <button id="loadBtn" class="secondary">Load stream</button>
+      <button id="speechBtn" class="primary">Enable speech boost</button>
+    </div>
+
+    <div class="status" id="status">
+      Speech enhancement: <strong class="off">OFF</strong><br />
+      Ready to play.
+    </div>
+
+    <div class="small">
+      Note: speech boost works best if the stream allows Web Audio processing via
+      CORS. Most browsers also require a user gesture before audio processing can start.
+    </div>
+  </main>
+
+  <script>
+    const audio = document.getElementById('player');
+    const speechBtn = document.getElementById('speechBtn');
+    const statusEl = document.getElementById('status');
+    const loadBtn = document.getElementById('loadBtn');
+    const streamUrlInput = document.getElementById('streamUrl');
+
+    let audioContext;
+    let sourceNode;
+    let dryGain;
+    let wetGain;
+    let highpass;
+    let mudCut;
+    let presenceBoost;
+    let compressor;
+    let initialized = false;
+    let speechEnabled = false;
+
+    function setStatus(message, enabled) {
+      statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
+    }
+
+    async function ensureAudioGraph() {
+      if (initialized) {
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        return;
+      }
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      sourceNode = audioContext.createMediaElementSource(audio);
+
+      dryGain = audioContext.createGain();
+      wetGain = audioContext.createGain();
+
+      highpass = audioContext.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = 120;
+
+      mudCut = audioContext.createBiquadFilter();
+      mudCut.type = 'peaking';
+      mudCut.frequency.value = 300;
+      mudCut.Q.value = 1.0;
+      mudCut.gain.value = -2.5;
+
+      presenceBoost = audioContext.createBiquadFilter();
+      presenceBoost.type = 'peaking';
+      presenceBoost.frequency.value = 2800;
+      presenceBoost.Q.value = 1.2;
+      presenceBoost.gain.value = 3.5;
+
+      compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 20;
+      compressor.ratio.value = 3;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      // Dry path
+      sourceNode.connect(dryGain);
+      dryGain.connect(audioContext.destination);
+
+      // Wet path
+      sourceNode.connect(highpass);
+      highpass.connect(mudCut);
+      mudCut.connect(presenceBoost);
+      presenceBoost.connect(compressor);
+      compressor.connect(wetGain);
+      wetGain.connect(audioContext.destination);
+
+      initialized = true;
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      applySpeechState();
+    }
+
+    function applySpeechState() {
+      if (!initialized) return;
+
+      dryGain.gain.value = speechEnabled ? 0 : 1;
+      wetGain.gain.value = speechEnabled ? 1 : 0;
+
+      setStatus(
+        speechEnabled
+          ? 'Speech frequencies are being emphasized with light compression.'
+          : 'Original audio is playing without enhancement.',
+        speechEnabled
+      );
+
+      speechBtn.textContent = speechEnabled ? 'Disable speech boost' : 'Enable speech boost';
+    }
+
+    loadBtn.addEventListener('click', async () => {
+      const url = streamUrlInput.value.trim();
+      if (!url) {
+        setStatus('Please enter a valid stream URL.', speechEnabled);
+        return;
+      }
+
+      audio.pause();
+      audio.src = url;
+      audio.load();
+
+      try {
+        await ensureAudioGraph();
+        setStatus('Stream loaded. Press play to start listening.', speechEnabled);
+      } catch (error) {
+        console.error(error);
+        setStatus('Could not initialize audio processing. The stream may block Web Audio processing.', false);
+      }
+    });
+
+    speechBtn.addEventListener('click', async () => {
+      try {
+        await ensureAudioGraph();
+        speechEnabled = !speechEnabled;
+        applySpeechState();
+      } catch (error) {
+        console.error(error);
+        setStatus('Speech enhancement could not be enabled. The stream may not allow cross-origin audio processing.', false);
+      }
+    });
+
+    audio.addEventListener('play', async () => {
+      try {
+        await ensureAudioGraph();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>
