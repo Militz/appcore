@@ -143,16 +143,16 @@
   <main class="card">
     <h1>SR Speech Boost Player</h1>
     <p>
-      Simple web player with channel selection, HLS support, and toggleable speech enhancement.
+      Simple web player with channel selection, direct MP3 stream support, and toggleable speech enhancement.
     </p>
 
     <div class="grid">
       <div>
         <label for="channelSelect" class="field-label">Kanal</label>
         <select id="channelSelect" class="select" aria-label="Choose SR channel">
-          <option value="https://edge1.sr.se/p1-mp3-96">P1</option>
+          <option value="https://live1.sr.se/p1-mp3-96">P1</option>
           <option value="https://live1.sr.se/p2-mp3-96">P2</option>
-          <option value="https://live1.sr.se/p3-mp3-96 ">P3</option>
+          <option value="https://live1.sr.se/p3-mp3-96">P3</option>
         </select>
       </div>
       <div>
@@ -165,6 +165,14 @@
       </div>
     </div>
 
+    <label for="streamUrl" class="field-label">Ström-URL</label>
+    <input
+      id="streamUrl"
+      class="stream-url"
+      type="text"
+      value="https://live1.sr.se/p1-aac-320"
+      aria-label="Audio stream URL"
+    />
 
     <audio id="player" controls crossorigin="anonymous"></audio>
 
@@ -179,12 +187,11 @@
     </div>
 
     <div class="small">
-      HLS stöds via browserns inbyggda stöd eller hls.js. Speech boost kräver också att strömmen tillåter Web Audio/CORS.
+      Stöder direkta MP3-ljudströmmar. Speech boost kräver också att strömmen tillåter Web Audio/CORS.
     </div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script>
+    <script>
     const audio = document.getElementById('player');
     const speechBtn = document.getElementById('speechBtn');
     const statusEl = document.getElementById('status');
@@ -204,7 +211,6 @@
     let initialized = false;
     let speechEnabled = false;
     let speechStrength = 'medium';
-    let hls = null;
 
     function setStatus(message, enabled) {
       statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
@@ -314,35 +320,13 @@
       speechBtn.textContent = speechEnabled ? 'Stäng av speech boost' : 'Aktivera speech boost';
     }
 
-    function destroyHls() {
-      if (hls) {
-        hls.destroy();
-        hls = null;
-      }
-    }
-
-    function looksLikeHls(url) {
-      return url.includes('.m3u8');
+    function looksLikeDirectAudioStream(url) {
+      return /mp3|mpeg|audio/i.test(url);
     }
 
     async function loadStream(url) {
-      destroyHls();
       audio.pause();
-
-      if (looksLikeHls(url)) {
-        if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-          audio.src = url;
-        } else if (window.Hls && Hls.isSupported()) {
-          hls = new Hls();
-          hls.loadSource(url);
-          hls.attachMedia(audio);
-        } else {
-          throw new Error('HLS is not supported in this browser.');
-        }
-      } else {
-        audio.src = url;
-      }
-
+      audio.src = url;
       audio.load();
       await ensureAudioGraph();
     }
@@ -371,7 +355,9 @@
 
       try {
         await loadStream(url);
-        setStatus(`Ström laddad från ${channelSelect.options[channelSelect.selectedIndex]?.text || 'vald kanal'}. Tryck på play för att lyssna.`, speechEnabled);
+        const selectedName = channelSelect.options[channelSelect.selectedIndex]?.text || 'vald kanal';
+        const streamType = looksLikeDirectAudioStream(url) ? 'MP3-direktström' : 'ström';
+        setStatus(`Ström laddad från ${selectedName} (${streamType}). Tryck på play för att lyssna.`, speechEnabled);
       } catch (error) {
         console.error(error);
         setStatus('Kunde inte ladda strömmen eller initiera ljudbehandling.', false);
