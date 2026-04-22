@@ -133,16 +133,23 @@
       using the Web Audio API.
     </p>
 
+    <label for="channelSelect" class="small" style="display:block; margin-bottom:8px;">Choose channel</label>
+    <select id="channelSelect" class="stream-url" aria-label="Choose SR channel">
+      <option value="https://live1.sr.se/p1-aac-320">P1</option>
+      <option value="https://live1.sr.se/p2-aac-320">P2</option>
+      <option value="https://live1.sr.se/p3-aac-320">P3</option>
+    </select>
+
     <input
       id="streamUrl"
       class="stream-url"
       type="text"
-      value="https://edge1.sr.se/p1-mp3-96"
+      value="https://live1.sr.se/p1-aac-320"
       aria-label="Audio stream URL"
     />
 
     <audio id="player" controls crossorigin="anonymous">
-      <source src="https://live1.sr.se/p1-aac-320" type="audio/mpeg" />
+      <source src="https://live1.sr.se/p1-aac-320" type="audio/aac" />
       Your browser does not support the audio element.
     </audio>
 
@@ -168,6 +175,7 @@
     const statusEl = document.getElementById('status');
     const loadBtn = document.getElementById('loadBtn');
     const streamUrlInput = document.getElementById('streamUrl');
+    const channelSelect = document.getElementById('channelSelect');
 
     let audioContext;
     let sourceNode;
@@ -258,6 +266,10 @@
       speechBtn.textContent = speechEnabled ? 'Disable speech boost' : 'Enable speech boost';
     }
 
+    channelSelect.addEventListener('change', () => {
+      streamUrlInput.value = channelSelect.value;
+    });
+
     loadBtn.addEventListener('click', async () => {
       const url = streamUrlInput.value.trim();
       if (!url) {
@@ -287,6 +299,20 @@
         console.error(error);
         setStatus('Speech enhancement could not be enabled. The stream may not allow cross-origin audio processing.', false);
       }
+    });
+
+    audio.addEventListener('play', async () => {
+      try {
+        await ensureAudioGraph();
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    streamUrlInput.value = channelSelect.value;
+
+    audio.addEventListener('loadedmetadata', () => {
+      setStatus(`Stream loaded from ${channelSelect.options[channelSelect.selectedIndex]?.text || 'selected channel'}. Press play to start listening.`, speechEnabled);
     });
 
     audio.addEventListener('play', async () => {
