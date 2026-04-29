@@ -375,7 +375,7 @@
         isTestingEffect = true;
         testBtn.disabled = true;
 
-        const stepDuration = 3000;
+        const stepDuration = 5000;
         const repetitions = 3;
         const totalSteps = repetitions * 2;
 
@@ -387,7 +387,7 @@
             speechEnabled = isSpeechStep;
 
             const mode = isSpeechStep ? 'speech boost' : 'original';
-            const message = `Test ${round} av ${repetitions}: ${mode} i 3 sekunder.`;
+            const message = `Test ${round} av ${repetitions}: ${mode} i ${stepDuration/1000} sekunder.`;
 
             applySpeechState(message);
           }, step * stepDuration);
