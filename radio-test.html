@@ -107,12 +107,6 @@
       color: #082f49;
     }
 
-    .secondary {
-      background: rgba(255,255,255,0.08);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
     .status {
       padding: 14px 16px;
       border-radius: 16px;
@@ -185,7 +179,7 @@
     </div>
 
     <div class="small">
-      Speech boost kräver att ljudströmmen tillåter Web Audio/CORS.
+      Speech boost använder EQ och kompression för att lyfta fram tal. Det är inte riktig AI-brusreducering, men kan göra tal tydligare och minska störande lågfrekvent bakgrund.
     </div>
   </main>
 
@@ -198,12 +192,16 @@
 
     let audioContext;
     let sourceNode;
+
     let dryGain;
     let wetGain;
+
     let highpass;
     let mudCut;
+    let clarityBoost;
     let presenceBoost;
     let compressor;
+
     let initialized = false;
     let speechEnabled = false;
     let speechStrength = 'medium';
@@ -211,7 +209,10 @@
     let testTimeouts = [];
 
     function setStatus(message, enabled) {
-      statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
+      statusEl.innerHTML = `
+        Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />
+        ${message}
+      `;
     }
 
     function clearTestTimeouts() {
@@ -224,44 +225,74 @@
       if (!initialized) return;
 
       if (speechStrength === 'low') {
-        highpass.frequency.value = 160;
-        mudCut.frequency.value = 280;
-        mudCut.Q.value = 1.0;
-        mudCut.gain.value = -3.0;
-        presenceBoost.frequency.value = 2600;
-        presenceBoost.Q.value = 1.4;
-        presenceBoost.gain.value = 4.5;
-        compressor.threshold.value = -26;
-        compressor.knee.value = 20;
-        compressor.ratio.value = 3;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.20;
-      } else if (speechStrength === 'high') {
-        highpass.frequency.value = 220;
-        mudCut.frequency.value = 320;
-        mudCut.Q.value = 1.2;
-        mudCut.gain.value = -6.0;
-        presenceBoost.frequency.value = 3200;
-        presenceBoost.Q.value = 1.8;
-        presenceBoost.gain.value = 9.0;
-        compressor.threshold.value = -34;
-        compressor.knee.value = 28;
-        compressor.ratio.value = 6;
-        compressor.attack.value = 0.002;
-        compressor.release.value = 0.30;
-      } else {
-        highpass.frequency.value = 180;
+        // Mild förbättring.
+        // Bra när ljudet redan är ganska rent och man bara vill göra talet lite tydligare.
+        highpass.frequency.value = 120;
+
         mudCut.frequency.value = 300;
+        mudCut.Q.value = 1.0;
+        mudCut.gain.value = -2.5;
+
+        clarityBoost.frequency.value = 1600;
+        clarityBoost.Q.value = 1.0;
+        clarityBoost.gain.value = 2.0;
+
+        presenceBoost.frequency.value = 2800;
+        presenceBoost.Q.value = 1.1;
+        presenceBoost.gain.value = 3.0;
+
+        compressor.threshold.value = -24;
+        compressor.knee.value = 22;
+        compressor.ratio.value = 2.5;
+        compressor.attack.value = 0.006;
+        compressor.release.value = 0.18;
+
+      } else if (speechStrength === 'high') {
+        // Stark speech boost.
+        // Mer aggressiv mot mummel, lågfrekvent bakgrund och otydligt tal.
+        // Kan låta lite vassare på vissa röster eller sämre inspelningar.
+        highpass.frequency.value = 180;
+
+        mudCut.frequency.value = 360;
+        mudCut.Q.value = 1.2;
+        mudCut.gain.value = -6.5;
+
+        clarityBoost.frequency.value = 1700;
+        clarityBoost.Q.value = 1.1;
+        clarityBoost.gain.value = 4.0;
+
+        presenceBoost.frequency.value = 3400;
+        presenceBoost.Q.value = 1.35;
+        presenceBoost.gain.value = 6.5;
+
+        compressor.threshold.value = -32;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 5.5;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.26;
+
+      } else {
+        // Rekommenderat standardläge.
+        // Bäst balans mellan tydligare tal och naturligt ljud.
+        highpass.frequency.value = 150;
+
+        mudCut.frequency.value = 330;
         mudCut.Q.value = 1.1;
         mudCut.gain.value = -4.5;
-        presenceBoost.frequency.value = 2900;
-        presenceBoost.Q.value = 1.6;
-        presenceBoost.gain.value = 6.5;
-        compressor.threshold.value = -30;
-        compressor.knee.value = 24;
-        compressor.ratio.value = 4;
-        compressor.attack.value = 0.0025;
-        compressor.release.value = 0.24;
+
+        clarityBoost.frequency.value = 1650;
+        clarityBoost.Q.value = 1.0;
+        clarityBoost.gain.value = 3.0;
+
+        presenceBoost.frequency.value = 3100;
+        presenceBoost.Q.value = 1.25;
+        presenceBoost.gain.value = 5.0;
+
+        compressor.threshold.value = -28;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 3.5;
+        compressor.attack.value = 0.005;
+        compressor.release.value = 0.22;
       }
     }
 
@@ -274,6 +305,7 @@
       }
 
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
       sourceNode = audioContext.createMediaElementSource(audio);
 
       dryGain = audioContext.createGain();
@@ -285,22 +317,29 @@
       mudCut = audioContext.createBiquadFilter();
       mudCut.type = 'peaking';
 
+      clarityBoost = audioContext.createBiquadFilter();
+      clarityBoost.type = 'peaking';
+
       presenceBoost = audioContext.createBiquadFilter();
       presenceBoost.type = 'peaking';
 
       compressor = audioContext.createDynamicsCompressor();
 
+      // Originalsignal.
       sourceNode.connect(dryGain);
       dryGain.connect(audioContext.destination);
 
+      // Speech boost-signal.
       sourceNode.connect(highpass);
       highpass.connect(mudCut);
-      mudCut.connect(presenceBoost);
+      mudCut.connect(clarityBoost);
+      clarityBoost.connect(presenceBoost);
       presenceBoost.connect(compressor);
       compressor.connect(wetGain);
       wetGain.connect(audioContext.destination);
 
       initialized = true;
+
       applySpeechPreset();
       applySpeechState();
 
@@ -315,10 +354,15 @@
       dryGain.gain.value = speechEnabled ? 0 : 1;
       wetGain.gain.value = speechEnabled ? 1.1 : 0;
 
-      const labels = { low: 'låg', medium: 'mellan', high: 'stark' };
+      const labels = {
+        low: 'låg',
+        medium: 'mellan',
+        high: 'stark'
+      };
+
       const defaultMessage = speechEnabled
-        ? `Speech boost är aktiv med ${labels[speechStrength]} filtrering och lätt kompression.`
-        : 'Original audio spelas utan enhancement.';
+        ? `Speech boost är aktiv med ${labels[speechStrength]} förstärkning.`
+        : 'Original audio spelas utan speech boost.';
 
       setStatus(customMessage || defaultMessage, speechEnabled);
     }
@@ -350,7 +394,7 @@
       } catch (error) {
         console.error(error);
         testBtn.disabled = true;
-        setStatus('Kunde inte ladda ljudet eller initiera ljudbehandling.', false);
+        setStatus('Kunde inte ladda ljudet eller initiera ljudbehandling. Strömmen kanske inte tillåter Web Audio/CORS.', false);
       }
     });
 
@@ -360,9 +404,13 @@
       try {
         await ensureAudioGraph();
         applySpeechPreset();
-        applySpeechState();
+
+        if (!isTestingEffect) {
+          applySpeechState();
+        }
       } catch (error) {
         console.error(error);
+        setStatus('Kunde inte ändra speech boost-inställning.', false);
       }
     });
 
@@ -387,7 +435,7 @@
             speechEnabled = isSpeechStep;
 
             const mode = isSpeechStep ? 'speech boost' : 'original';
-            const message = `Test ${round} av ${repetitions}: ${mode} i ${stepDuration/1000} sekunder.`;
+            const message = `Test ${round} av ${repetitions}: ${mode} i 5 sekunder.`;
 
             applySpeechState(message);
           }, step * stepDuration);
@@ -407,6 +455,7 @@
       } catch (error) {
         console.error(error);
         testBtn.disabled = false;
+        isTestingEffect = false;
         setStatus('Kunde inte testa speech boost. Strömmen kanske inte tillåter Web Audio/CORS.', false);
       }
     });
@@ -416,6 +465,7 @@
         await ensureAudioGraph();
       } catch (error) {
         console.error(error);
+        setStatus('Kunde inte initiera ljudbehandling.', false);
       }
     });
   </script>
