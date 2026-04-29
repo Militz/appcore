@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -57,8 +57,7 @@
       color: var(--muted);
     }
 
-    .select,
-    .stream-url {
+    .select {
       display: block;
       width: 100%;
       padding: 12px 14px;
@@ -96,6 +95,12 @@
 
     button:hover { transform: translateY(-1px); }
     button:active { transform: translateY(0); }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .primary {
       background: var(--accent);
@@ -143,19 +148,21 @@
   <main class="card">
     <h1>SR Speech Boost Player</h1>
     <p>
-      Simple web player with channel selection, direct MP3 stream support, and toggleable speech enhancement.
+      Enkel webbspelare för att testa speech boost på olika ljudströmmar.
     </p>
 
     <div class="grid">
       <div>
-        <label for="channelSelect" class="field-label">Kanal</label>
-        <select id="channelSelect" class="select" aria-label="Choose SR channel">
+        <label for="channelSelect" class="field-label">Ljud</label>
+        <select id="channelSelect" class="select" aria-label="Välj ljud">
+          <option value="" selected disabled>Välj ljud</option>
           <option value="https://edge1.sr.se/p1-aac-320">P1</option>
           <option value="https://edge1.sr.se/p2-aac-320">P2</option>
           <option value="https://edge1.sr.se/p3-aac-320">P3</option>
-          <option value="https://bauernordic-pods.sharp-stream.com/1573/svenska_fall_final_c18ce6e5_normal.mp3?aw_0_1st.episodeid=253871&aw_0_1st.collectionid=1573">Test Podd (23:50 min in)</option>
+          <option value="https://bauernordic-pods.sharp-stream.com/1573/svenska_fall_final_c18ce6e5_normal.mp3?aw_0_1st.episodeid=253871&aw_0_1st.collectionid=1573">Test Podd</option>
         </select>
       </div>
+
       <div>
         <label for="strengthSelect" class="field-label">Speech boost</label>
         <select id="strengthSelect" class="select" aria-label="Speech boost strength">
@@ -165,29 +172,26 @@
         </select>
       </div>
     </div>
-<audio id="player" controls crossorigin="anonymous"></audio>
+
+    <audio id="player" controls crossorigin="anonymous"></audio>
 
     <div class="controls">
-      <button id="loadBtn" class="secondary">Ladda ström</button>
-      <button id="speechBtn" class="primary">Aktivera speech boost</button>
-      <button id="testBtn" class="secondary">Testa effekt</button>
+      <button id="testBtn" class="primary" disabled>Testa speech boost</button>
     </div>
 
     <div class="status" id="status">
       Speech enhancement: <strong class="off">OFF</strong><br />
-      Ready to play.
+      Välj ljud för att börja.
     </div>
 
     <div class="small">
-      Stöder direkta MP3-ljudströmmar. Speech boost kräver också att strömmen tillåter Web Audio/CORS.
+      Speech boost kräver att ljudströmmen tillåter Web Audio/CORS.
     </div>
   </main>
 
-    <script>
+  <script>
     const audio = document.getElementById('player');
-    const speechBtn = document.getElementById('speechBtn');
     const statusEl = document.getElementById('status');
-    const loadBtn = document.getElementById('loadBtn');
     const channelSelect = document.getElementById('channelSelect');
     const strengthSelect = document.getElementById('strengthSelect');
     const testBtn = document.getElementById('testBtn');
@@ -204,9 +208,16 @@
     let speechEnabled = false;
     let speechStrength = 'medium';
     let isTestingEffect = false;
+    let testTimeouts = [];
 
     function setStatus(message, enabled) {
       statusEl.innerHTML = `Speech enhancement: <strong class="${enabled ? 'on' : 'off'}">${enabled ? 'ON' : 'OFF'}</strong><br />${message}`;
+    }
+
+    function clearTestTimeouts() {
+      testTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      testTimeouts = [];
+      isTestingEffect = false;
     }
 
     function applySpeechPreset() {
@@ -298,38 +309,54 @@
       }
     }
 
-    function applySpeechState() {
+    function applySpeechState(customMessage) {
       if (!initialized) return;
 
       dryGain.gain.value = speechEnabled ? 0 : 1;
       wetGain.gain.value = speechEnabled ? 1.1 : 0;
 
       const labels = { low: 'låg', medium: 'mellan', high: 'stark' };
-      const message = speechEnabled
+      const defaultMessage = speechEnabled
         ? `Speech boost är aktiv med ${labels[speechStrength]} filtrering och lätt kompression.`
-        : 'Original audio is playing without enhancement.';
+        : 'Original audio spelas utan enhancement.';
 
-      setStatus(message, speechEnabled);
-      speechBtn.textContent = speechEnabled ? 'Stäng av speech boost' : 'Aktivera speech boost';
-    }
-
-    function looksLikeDirectAudioStream(url) {
-      return /mp3|mpeg|audio/i.test(url);
+      setStatus(customMessage || defaultMessage, speechEnabled);
     }
 
     async function loadStream(url) {
+      clearTestTimeouts();
+
       audio.pause();
       audio.src = url;
       audio.load();
+
+      speechEnabled = false;
+
       await ensureAudioGraph();
+      applySpeechState();
+
+      testBtn.disabled = false;
     }
 
-    channelSelect.addEventListener('change', () => {
-      // kanal väljs här; laddas när användaren trycker på knappen
+    channelSelect.addEventListener('change', async () => {
+      const url = channelSelect.value;
+      const selectedName = channelSelect.options[channelSelect.selectedIndex]?.text || 'valt ljud';
+
+      if (!url) return;
+
+      try {
+        await loadStream(url);
+        setStatus(`${selectedName} är laddad. Tryck på play och sedan "Testa speech boost".`, false);
+      } catch (error) {
+        console.error(error);
+        testBtn.disabled = true;
+        setStatus('Kunde inte ladda ljudet eller initiera ljudbehandling.', false);
+      }
     });
 
     strengthSelect.addEventListener('change', async () => {
       speechStrength = strengthSelect.value;
+
       try {
         await ensureAudioGraph();
         applySpeechPreset();
@@ -339,52 +366,48 @@
       }
     });
 
-    loadBtn.addEventListener('click', async () => {
-      const url = channelSelect.value.trim();
-
-      try {
-        await loadStream(url);
-        const selectedName = channelSelect.options[channelSelect.selectedIndex]?.text || 'vald kanal';
-        const streamType = looksLikeDirectAudioStream(url) ? 'MP3-direktström' : 'ström';
-        setStatus(`Ström laddad från ${selectedName} (${streamType}). Tryck på play för att lyssna.`, speechEnabled);
-      } catch (error) {
-        console.error(error);
-        setStatus('Kunde inte ladda strömmen eller initiera ljudbehandling.', false);
-      }
-    });
-
-    speechBtn.addEventListener('click', async () => {
-      try {
-        await ensureAudioGraph();
-        speechEnabled = !speechEnabled;
-        applySpeechState();
-      } catch (error) {
-        console.error(error);
-        setStatus('Speech enhancement could not be enabled. The stream may not allow cross-origin audio processing.', false);
-      }
-    });
-
     testBtn.addEventListener('click', async () => {
       try {
         await ensureAudioGraph();
+
+        clearTestTimeouts();
+
         isTestingEffect = true;
-        speechEnabled = false;
-        applySpeechState();
-        setStatus('Testläge: original i 2 sekunder, sedan speech boost i 2 sekunder.', false);
+        testBtn.disabled = true;
 
-        setTimeout(() => {
-          speechEnabled = true;
-          applySpeechState();
-        }, 2000);
+        const stepDuration = 3000;
+        const repetitions = 3;
+        const totalSteps = repetitions * 2;
 
-        setTimeout(() => {
+        for (let step = 0; step < totalSteps; step++) {
+          const timeoutId = setTimeout(() => {
+            const isSpeechStep = step % 2 === 1;
+            const round = Math.floor(step / 2) + 1;
+
+            speechEnabled = isSpeechStep;
+
+            const mode = isSpeechStep ? 'speech boost' : 'original';
+            const message = `Test ${round} av ${repetitions}: ${mode} i 3 sekunder.`;
+
+            applySpeechState(message);
+          }, step * stepDuration);
+
+          testTimeouts.push(timeoutId);
+        }
+
+        const doneTimeoutId = setTimeout(() => {
           speechEnabled = false;
-          applySpeechState();
+          applySpeechState('Test klart. Speech boost är avstängd igen.');
           isTestingEffect = false;
-          setStatus('Test klart. Jämför nu manuellt med knappen för speech boost.', false);
-        }, 4000);
+          testBtn.disabled = false;
+        }, totalSteps * stepDuration);
+
+        testTimeouts.push(doneTimeoutId);
+
       } catch (error) {
         console.error(error);
+        testBtn.disabled = false;
+        setStatus('Kunde inte testa speech boost. Strömmen kanske inte tillåter Web Audio/CORS.', false);
       }
     });
 
@@ -395,8 +418,6 @@
         console.error(error);
       }
     });
-
-    streamUrlInput.value = channelSelect.value;
   </script>
 </body>
 </html>
